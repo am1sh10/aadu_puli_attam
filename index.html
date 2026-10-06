@@ -1,0 +1,1430 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="theme-color" content="#241A12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Puli Aattam">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aadu Puli Aattam</title>
+<style>
+:root{--teak:#241A12;--teak2:#34261A;--ink:#F2E4C8;--muted:#BBAA8A;--saffron:#E8872B;--brass:#C79A5B;--danger:#E0533F;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+html,body{height:100%;margin:0}
+body{background:var(--teak);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+#app{display:flex;flex-direction:column;height:100%;max-width:760px;margin:0 auto;padding:10px 14px}
+h1,h2{font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;font-weight:700;margin:0}
+h1{font-size:1.55rem;line-height:1.15}
+#msg{margin:.2rem 0 .5rem;min-height:2.6em;color:var(--saffron)}
+#board{flex:1;min-height:0}
+#board svg{width:100%;height:100%;display:block;touch-action:manipulation}
+footer{padding-top:8px}
+#counts{display:flex;justify-content:space-between;gap:12px;margin-bottom:8px;color:var(--muted)}
+#counts b{color:var(--ink)}
+.pips{letter-spacing:.15em;color:var(--saffron)}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+button{font:inherit;color:var(--ink);background:transparent;border:1px solid var(--brass);border-radius:999px;padding:.5rem 1.05rem;min-height:44px;cursor:pointer}
+button.primary{background:var(--saffron);border-color:var(--saffron);color:#241A12;font-weight:600}
+button[aria-pressed=true]{background:var(--saffron);border-color:var(--saffron);color:#241A12;font-weight:600}
+.side{align-items:center}
+.col{display:flex;flex-direction:column;gap:10px}
+.big{font-size:1.1rem;padding:.85rem 1.2rem;text-align:left}
+h3{margin:.6rem 0 .1rem;color:var(--saffron);font-size:1rem}
+body.clean #bar,body.clean #counts,body.clean #end{display:none}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible{outline:2px solid var(--saffron);outline-offset:2px}
+#end p{margin:.1rem 0 .6rem}
+.sheet{position:fixed;inset:0;z-index:5;background:rgba(22,14,8,.96);overflow:auto;padding:max(24px,env(safe-area-inset-top,0px)) 22px max(24px,env(safe-area-inset-bottom,0px))}
+.sheet>div{max-width:520px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;justify-content:center;gap:14px}
+.sheet h2{font-size:2.1rem;line-height:1.1}
+.sheet p,.sheet li{margin:0;max-width:62ch}
+.sheet ul{margin:0;padding-left:1.1rem;display:flex;flex-direction:column;gap:9px}
+.pulse{animation:pulse 1.3s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.3}}
+.hop{animation:hop .7s ease-in-out infinite alternate}
+@keyframes hop{to{transform:translateY(-12px)}}
+.fall{animation:fall 3.2s linear infinite}
+@keyframes fall{to{transform:translateY(300px)}}
+#celeBody svg{width:100%;max-height:46vh}
+@media (prefers-reduced-motion:reduce){.pulse,.hop,.fall{animation:none}}
+</style>
+</head>
+<body>
+<main id="app">
+  <header><h1 id="turn"></h1><p id="msg" role="status"></p></header>
+  <div id="board"></div>
+  <footer>
+    <div id="counts"></div>
+    <div id="bar" class="row"></div>
+    <div id="end"></div>
+  </footer>
+</main>
+
+<section id="cele" class="sheet" hidden><div id="celeBody"></div></section>
+
+<section id="home" class="sheet"><div>
+  <h2>Aadu Puli Aattam</h2>
+  <p>Three tigers hunt fifteen goats on a 23-point board. The goats win by trapping every tiger. The tigers win by capturing five goats.</p>
+  <p>A traditional strategy game from South India. Learn it step by step, solve puzzles, or play the computer or a friend.</p>
+  <div class="col">
+    <button class="primary big" data-act="goLearn">Learn</button>
+    <button class="big" data-act="goPlay">Play</button>
+    <button class="big" data-act="goPuzzles">Puzzles</button>
+  </div>
+  <div class="row"><button data-act="how">How to play</button><button data-act="goMore">More</button></div>
+</div></section>
+
+<section id="list" class="sheet" hidden><div id="listBody"></div></section>
+
+<section id="start" class="sheet" hidden><div>
+  <h2>Play</h2>
+  <div class="row side" role="group" aria-label="Play against"><span>Play against</span>
+    <button id="modeCpu" data-act="modeCpu" aria-pressed="true">Computer</button>
+    <button id="modePerson" data-act="modePerson" aria-pressed="false">Another person</button>
+  </div>
+  <div class="row side" id="levels" role="group" aria-label="Computer level"><span>Level</span>
+    <button id="lvlEasy" data-act="lvlEasy" aria-pressed="false">Easy</button>
+    <button id="lvlMedium" data-act="lvlMedium" aria-pressed="true">Medium</button>
+    <button id="lvlHard" data-act="lvlHard" aria-pressed="false">Hard</button>
+  </div>
+  <div class="row side" role="group" aria-label="Your side">
+    <span>You play as</span>
+    <button id="sideGoat" data-act="sideGoat" aria-pressed="false">Goats</button>
+    <button id="sideTiger" data-act="sideTiger" aria-pressed="true">Tigers</button>
+  </div>
+  <p>Your side sits at the bottom of the screen; the computer or the other player takes the other side. Goats move first. You can flip the board any time.</p>
+  <div class="row">
+    <button class="primary" data-act="start">Start a game</button>
+    <button data-act="resume" id="resume" hidden>Resume game</button>
+    <button data-act="how">How to play</button>
+    <button data-act="goHome">Back</button>
+  </div>
+  <div class="row"><button id="musicBtn" data-act="music">Music: On</button><button data-act="test">Test sound</button></div>
+  <p>No sound on iPhone or iPad? Check that the silent switch is off and the volume is up.</p>
+</div></section>
+
+<section id="how" class="sheet" hidden><div>
+  <h2>How to play</h2>
+  <ul>
+    <li><b>Goats move first.</b> Each turn, place one goat on any empty point. Goats cannot move until all 15 are placed. After that, a goat moves one step along a line to an empty point.</li>
+    <li><b>Tigers</b> start on the apex and the two points beside it. A tiger steps along a line to an empty point, or jumps over a goat right next to it to the empty point directly behind, capturing that goat.</li>
+    <li><b>Capturing is mandatory.</b> If a tiger can jump, a tiger must jump. One jump per turn, no chains.</li>
+    <li><b>Tigers win</b> by capturing 5 goats. <b>Goats win</b> when no tiger can step or jump.</li>
+    <li>If the same position appears three times, the game is a draw. After 30 moves each without a capture, either player can claim a draw.</li>
+    <li>Tap a piece, then tap where it goes. In Guided help, a red ring marks a goat a tiger can capture, a dashed ring shows where the tiger would land, and the number beside each tiger counts its moves.</li>
+  </ul>
+  <div class="row"><button class="primary" data-act="closeHow">Got it</button></div>
+</div></section>
+
+<script>if (location.protocol.startsWith("http") && "serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});</script>
+<script>
+(function(){
+// Board definition for Aadu Puli Aattam: 23 points numbered 0..22 (22 is the apex).
+// The board is described ONLY as 10 straight lines. Every legal step (two
+// neighbours on a line) and every legal jump (three in a row on a line) is
+// derived from them, so there is nothing else to type or get wrong.
+
+const POINT_COUNT = 23;
+const APEX = 22;
+
+const LINES = Object.freeze(
+  [
+    // four rows (wide side first, apex last)
+    [0, 1, 2, 3],
+    [4, 5, 6, 7, 8, 9],
+    [10, 11, 12, 13, 14, 15],
+    [16, 17, 18, 19, 20, 21],
+    // the two side lines
+    [4, 10, 16],
+    [9, 15, 21],
+    // the four lines that meet at the apex
+    [0, 5, 11, 17, 22],
+    [1, 6, 12, 18, 22],
+    [2, 7, 13, 19, 22],
+    [3, 8, 14, 20, 22],
+  ].map((line) => Object.freeze(line))
+);
+
+// Layout for the screen (x, y), used by the UI and by the geometry tests.
+const COORDS = Object.freeze(
+  [
+    [100, 50], [259, 50], [421, 50], [582, 50],
+    [100, 160], [159, 160], [279, 160], [401, 160], [523, 160], [582, 160],
+    [100, 230], [196, 230], [292, 230], [389, 230], [486, 230], [582, 230],
+    [100, 298], [233, 298], [304, 298], [377, 298], [449, 298], [582, 298],
+    [341, 500],
+  ].map((p) => Object.freeze(p))
+);
+
+const neighborSets = Array.from({ length: POINT_COUNT }, () => new Set());
+const jumpList = [];
+
+for (const line of LINES) {
+  for (let i = 0; i + 1 < line.length; i++) {
+    neighborSets[line[i]].add(line[i + 1]);
+    neighborSets[line[i + 1]].add(line[i]);
+  }
+  for (let i = 0; i + 2 < line.length; i++) {
+    const a = line[i];
+    const b = line[i + 1];
+    const c = line[i + 2];
+    jumpList.push(Object.freeze({ from: a, over: b, to: c }));
+    jumpList.push(Object.freeze({ from: c, over: b, to: a }));
+  }
+}
+
+/** NEIGHBORS[p] = points one step from p along a line (sorted). */
+const NEIGHBORS = Object.freeze(
+  neighborSets.map((s) => Object.freeze([...s].sort((x, y) => x - y)))
+);
+
+/** Every directed jump {from, over, to}. */
+const JUMPS = Object.freeze(jumpList);
+
+/** JUMPS_FROM[p] = list of {over, to} for jumps that start at p. */
+const JUMPS_FROM = Object.freeze(
+  Array.from({ length: POINT_COUNT }, (_, p) =>
+    Object.freeze(
+      jumpList.filter((j) => j.from === p).map((j) => Object.freeze({ over: j.over, to: j.to }))
+    )
+  )
+);
+
+const jumpKeys = new Set(jumpList.map((j) => `${j.from}>${j.over}>${j.to}`));
+
+function isPoint(p) {
+  return Number.isInteger(p) && p >= 0 && p < POINT_COUNT;
+}
+
+function areConnected(a, b) {
+  return isPoint(a) && isPoint(b) && NEIGHBORS[a].includes(b);
+}
+
+function isJumpLine(from, over, to) {
+  return jumpKeys.has(`${from}>${over}>${to}`);
+}
+
+// Rules engine for Aadu Puli Aattam. Pure functions, no UI, no randomness.
+// A game state is plain JSON (safe to save, resume, undo and replay).
+// Every function that needs rules takes a `config` (see createConfig).
+
+
+
+const GOAT = 'G';
+const TIGER = 'T';
+
+/** Ruleset decisions from the spec. Everything here is a setting. */
+const DEFAULT_CONFIG = Object.freeze({
+  tigerStart: Object.freeze([22, 18, 19]),
+  goatCount: 15,
+  capturesToWin: 5, // handicap: 3..8, or 15 for the "all goats" version
+  forcedCapture: true, // house rule: a tiger must capture when it can
+  goatStuck: 'pass', // goats have no move in Phase 2: 'pass' or 'tiger_win'
+  repetitionLimit: 3, // draw when a position occurs this many times
+  claimDrawAfterMovesEach: 30, // claimable draw after N moves each with no progress
+});
+
+function createConfig(overrides = {}) {
+  const config = { ...DEFAULT_CONFIG, ...overrides };
+  if (!Array.isArray(config.tigerStart) || config.tigerStart.length < 1 ||
+      new Set(config.tigerStart).size !== config.tigerStart.length ||
+      !config.tigerStart.every(isPoint)) {
+    throw new RangeError('tigerStart must be distinct points on the board');
+  }
+  if (!Number.isInteger(config.goatCount) || config.goatCount < 1) {
+    throw new RangeError('goatCount must be a positive integer');
+  }
+  if (!Number.isInteger(config.capturesToWin) || config.capturesToWin < 1 ||
+      config.capturesToWin > config.goatCount) {
+    throw new RangeError('capturesToWin must be between 1 and goatCount');
+  }
+  if (config.goatStuck !== 'pass' && config.goatStuck !== 'tiger_win') {
+    throw new RangeError("goatStuck must be 'pass' or 'tiger_win'");
+  }
+  if (!Number.isInteger(config.repetitionLimit) || config.repetitionLimit < 2) {
+    throw new RangeError('repetitionLimit must be at least 2');
+  }
+  if (!Number.isInteger(config.claimDrawAfterMovesEach) || config.claimDrawAfterMovesEach < 1) {
+    throw new RangeError('claimDrawAfterMovesEach must be at least 1');
+  }
+  return Object.freeze(config);
+}
+
+class IllegalMoveError extends Error {
+  constructor({ code, message }) {
+    super(message);
+    this.name = 'IllegalMoveError';
+    this.code = code;
+  }
+}
+
+// ---------------------------------------------------------------- state ----
+
+function phaseOf(state) {
+  return state.goatsInHand > 0 ? 'placement' : 'movement';
+}
+
+function positionKey(state) {
+  return `${state.board.map((c) => c ?? '.').join('')}|${state.turn}|${state.goatsInHand}`;
+}
+
+/**
+ * Build any position (for scenarios, lessons, puzzles and tests).
+ * Totals are not forced to add up to goatCount; that is the caller's choice.
+ */
+function makeState(
+  config,
+  { tigers, goats = [], goatsInHand = 0, goatsCaptured = 0, turn = 'goat', plies = 0, pliesSinceProgress = 0 }
+) {
+  if (!Array.isArray(tigers) || tigers.length < 1) throw new RangeError('tigers required');
+  if (turn !== 'goat' && turn !== 'tiger') throw new RangeError("turn must be 'goat' or 'tiger'");
+  const board = Array(POINT_COUNT).fill(null);
+  const put = (p, piece) => {
+    if (!isPoint(p)) throw new RangeError(`point ${p} is not on the board`);
+    if (board[p] !== null) throw new RangeError(`point ${p} used twice`);
+    board[p] = piece;
+  };
+  tigers.forEach((p) => put(p, TIGER));
+  goats.forEach((p) => put(p, GOAT));
+  const base = {
+    board,
+    goatsInHand,
+    goatsCaptured,
+    turn,
+    plies,
+    pliesSinceProgress,
+    status: 'ongoing',
+    reason: null,
+    repetition: {},
+    history: [],
+  };
+  base.repetition[positionKey(base)] = 1;
+  return settle(base, config);
+}
+
+function newGame(config = DEFAULT_CONFIG) {
+  return makeState(config, {
+    tigers: [...config.tigerStart],
+    goats: [],
+    goatsInHand: config.goatCount,
+    turn: 'goat',
+  });
+}
+
+// ---------------------------------------------------------- move lookup ----
+
+function tigerPoints(board) {
+  const out = [];
+  for (let p = 0; p < POINT_COUNT; p++) if (board[p] === TIGER) out.push(p);
+  return out;
+}
+
+function tigerJumps(board) {
+  const out = [];
+  for (const from of tigerPoints(board)) {
+    for (const { over, to } of JUMPS_FROM[from]) {
+      if (board[over] === GOAT && board[to] === null) out.push({ type: 'jump', from, over, to });
+    }
+  }
+  return out;
+}
+
+function tigerSteps(board) {
+  const out = [];
+  for (const from of tigerPoints(board)) {
+    for (const to of NEIGHBORS[from]) {
+      if (board[to] === null) out.push({ type: 'move', from, to });
+    }
+  }
+  return out;
+}
+
+function goatSteps(board) {
+  const out = [];
+  for (let from = 0; from < POINT_COUNT; from++) {
+    if (board[from] !== GOAT) continue;
+    for (const to of NEIGHBORS[from]) {
+      if (board[to] === null) out.push({ type: 'move', from, to });
+    }
+  }
+  return out;
+}
+
+function tigerHasMove(board) {
+  return tigerJumps(board).length > 0 || tigerSteps(board).length > 0;
+}
+
+/** All legal moves for the side to move (empty when the game is over). */
+function legalMoves(state, config = DEFAULT_CONFIG) {
+  if (state.status !== 'ongoing') return [];
+  const { board } = state;
+  if (state.turn === 'goat') {
+    if (phaseOf(state) === 'placement') {
+      const out = [];
+      for (let to = 0; to < POINT_COUNT; to++) if (board[to] === null) out.push({ type: 'place', to });
+      return out;
+    }
+    const steps = goatSteps(board);
+    if (steps.length > 0) return steps;
+    return config.goatStuck === 'pass' ? [{ type: 'pass' }] : [];
+  }
+  const jumps = tigerJumps(board);
+  if (config.forcedCapture && jumps.length > 0) return jumps;
+  return [...jumps, ...tigerSteps(board)];
+}
+
+function sameMove(a, b) {
+  return a.type === b.type && a.from === b.from && a.over === b.over && a.to === b.to;
+}
+
+function isLegal(state, move, config = DEFAULT_CONFIG) {
+  if (!move || typeof move !== 'object') return false;
+  return legalMoves(state, config).some((m) => sameMove(m, move));
+}
+
+// -------------------------------------------------------- explain errors ----
+
+/** null when the move is legal, otherwise { code, message } saying why not. */
+function explainIllegal(state, move, config = DEFAULT_CONFIG) {
+  if (isLegal(state, move, config)) return null;
+  const why = (code, message) => ({ code, message });
+  if (state.status !== 'ongoing') return why('game_over', 'The game is over.');
+  if (!move || typeof move !== 'object') return why('bad_move', 'That is not a move.');
+  const { board } = state;
+  const side = state.turn === 'goat' ? "goats'" : "tigers'";
+  const wrongTurn = () => why('not_your_turn', `It is the ${side} turn.`);
+
+  switch (move.type) {
+    case 'place': {
+      if (state.turn !== 'goat') return wrongTurn();
+      if (phaseOf(state) !== 'placement') {
+        return why('placement_over', 'All goats are already on the board. Move a goat instead.');
+      }
+      if (!isPoint(move.to)) return why('off_board', 'That point is not on the board.');
+      if (board[move.to] !== null) return why('occupied', 'That point is already occupied.');
+      break;
+    }
+    case 'move': {
+      if (!isPoint(move.from) || !isPoint(move.to)) return why('off_board', 'That point is not on the board.');
+      const piece = board[move.from];
+      if (piece === null) return why('no_piece', 'There is no piece on that point.');
+      const owner = piece === GOAT ? 'goat' : 'tiger';
+      if (state.turn !== owner) return wrongTurn();
+      if (piece === GOAT && phaseOf(state) === 'placement') {
+        return why('goats_cannot_move_yet', "Goats can't move until all of them have been placed.");
+      }
+      if (!areConnected(move.from, move.to)) return why('not_connected', 'There is no line between those two points.');
+      if (board[move.to] !== null) return why('occupied', 'That point is already occupied.');
+      if (piece === TIGER && config.forcedCapture && tigerJumps(board).length > 0) {
+        return why('must_capture', 'A tiger must capture when it can.');
+      }
+      break;
+    }
+    case 'jump': {
+      if (!isPoint(move.from) || !isPoint(move.over) || !isPoint(move.to)) {
+        return why('off_board', 'That point is not on the board.');
+      }
+      const piece = board[move.from];
+      if (piece === GOAT) return why('goats_cannot_jump', 'Goats cannot jump.');
+      if (piece !== TIGER) return why('no_tiger', 'Only a tiger can jump.');
+      if (state.turn !== 'tiger') return wrongTurn();
+      if (board[move.over] === TIGER) return why('cannot_jump_tiger', "A tiger can't jump over another tiger.");
+      if (board[move.over] !== GOAT) return why('nothing_to_jump', 'There is no goat to jump over.');
+      if (!isJumpLine(move.from, move.over, move.to)) {
+        return why('not_a_jump_line', 'A jump goes straight along a line, over the next goat, to the point behind it.');
+      }
+      if (board[move.to] !== null) return why('landing_occupied', 'The point behind the goat is not empty.');
+      break;
+    }
+    case 'pass': {
+      if (state.turn !== 'goat') return wrongTurn();
+      return why('pass_not_allowed', 'A goat can move, so passing is not allowed.');
+    }
+    default:
+      return why('bad_move', 'That is not a move.');
+  }
+  return why('illegal', 'That move is not legal.');
+}
+
+// ------------------------------------------------------------ applying ----
+
+function settle(state, config) {
+  let status = 'ongoing';
+  let reason = null;
+  if (state.goatsCaptured >= config.capturesToWin) {
+    status = 'tiger_win';
+    reason = 'captures';
+  } else if (state.turn === 'tiger' && !tigerHasMove(state.board)) {
+    status = 'goat_win';
+    reason = 'tigers_trapped';
+  } else if (
+    state.turn === 'goat' &&
+    phaseOf(state) === 'movement' &&
+    config.goatStuck === 'tiger_win' &&
+    goatSteps(state.board).length === 0
+  ) {
+    status = 'tiger_win';
+    reason = 'goats_stuck';
+  } else if ((state.repetition[positionKey(state)] ?? 0) >= config.repetitionLimit) {
+    status = 'draw';
+    reason = 'repetition';
+  }
+  return { ...state, status, reason };
+}
+
+function recordOf(move) {
+  const rec = { type: move.type };
+  if (move.from !== undefined) rec.from = move.from;
+  if (move.over !== undefined) rec.over = move.over;
+  if (move.to !== undefined) rec.to = move.to;
+  return rec;
+}
+
+/** Returns a NEW state. Throws IllegalMoveError (with .code) for illegal moves. */
+function applyMove(state, move, config = DEFAULT_CONFIG) {
+  const problem = explainIllegal(state, move, config);
+  if (problem) throw new IllegalMoveError(problem);
+
+  const board = state.board.slice();
+  let { goatsInHand, goatsCaptured } = state;
+  let progress = false; // captures and goat placements cannot be undone
+
+  switch (move.type) {
+    case 'place':
+      board[move.to] = GOAT;
+      goatsInHand -= 1;
+      progress = true;
+      break;
+    case 'move':
+      board[move.to] = board[move.from];
+      board[move.from] = null;
+      break;
+    case 'jump':
+      board[move.from] = null;
+      board[move.over] = null;
+      board[move.to] = TIGER;
+      goatsCaptured += 1;
+      progress = true;
+      break;
+    case 'pass':
+      break;
+  }
+
+  const next = {
+    board,
+    goatsInHand,
+    goatsCaptured,
+    turn: state.turn === 'goat' ? 'tiger' : 'goat',
+    plies: state.plies + 1,
+    pliesSinceProgress: progress ? 0 : state.pliesSinceProgress + 1,
+    status: 'ongoing',
+    reason: null,
+    repetition: progress ? {} : { ...state.repetition },
+    history: [...state.history, recordOf(move)],
+  };
+  const key = positionKey(next);
+  next.repetition[key] = (next.repetition[key] ?? 0) + 1;
+  return settle(next, config);
+}
+
+/** Rebuild a game from its move list (replay, undo, resume). Returns every state. */
+function replayMoves(config, moves, start = newGame(config)) {
+  const states = [start];
+  for (const move of moves) states.push(applyMove(states[states.length - 1], move, config));
+  return states;
+}
+
+// ----------------------------------------------------------- draw claim ----
+
+function canClaimDraw(state, config = DEFAULT_CONFIG) {
+  return (
+    state.status === 'ongoing' &&
+    phaseOf(state) === 'movement' &&
+    state.pliesSinceProgress >= 2 * config.claimDrawAfterMovesEach
+  );
+}
+
+function claimDraw(state, config = DEFAULT_CONFIG) {
+  if (!canClaimDraw(state, config)) {
+    throw new IllegalMoveError({
+      code: 'draw_not_claimable',
+      message: `A draw can be claimed after ${config.claimDrawAfterMovesEach} moves each with no capture or placement.`,
+    });
+  }
+  return { ...state, status: 'draw', reason: 'claimed' };
+}
+
+// Rule-based helpers for the beginner aids (danger rings, move counters,
+// placement warning). Pure lookups on the current position: no search, no AI.
+
+
+
+
+/** Goats a tiger could capture right now: [{ tiger, goat, landing }]. */
+function threats(state) {
+  const out = [];
+  for (let tiger = 0; tiger < POINT_COUNT; tiger++) {
+    if (state.board[tiger] !== TIGER) continue;
+    for (const { over, to } of JUMPS_FROM[tiger]) {
+      if (state.board[over] === GOAT && state.board[to] === null) {
+        out.push({ tiger, goat: over, landing: to });
+      }
+    }
+  }
+  return out;
+}
+
+/** Per tiger: how many steps and jumps it has. Shown as the move counter. */
+function tigerMobility(state) {
+  const out = [];
+  for (let tiger = 0; tiger < POINT_COUNT; tiger++) {
+    if (state.board[tiger] !== TIGER) continue;
+    const steps = NEIGHBORS[tiger].filter((n) => state.board[n] === null).length;
+    const jumps = JUMPS_FROM[tiger].filter(
+      ({ over, to }) => state.board[over] === GOAT && state.board[to] === null
+    ).length;
+    out.push({ tiger, steps, jumps, total: steps + jumps });
+  }
+  return out;
+}
+
+/** If a goat were placed on `point`, which tiger jumps would capture that goat? */
+function placementRisk(state, point) {
+  if (state.board[point] !== null) return [];
+  const board = state.board.slice();
+  board[point] = GOAT;
+  return threats({ ...state, board }).filter((t) => t.goat === point);
+}
+
+// Computer player. Uses only the rules engine (same moves a human has, nothing hidden).
+// Easy:   half the time a random legal move, otherwise the Medium choice.
+// Medium: scores every move by what the position looks like afterwards (never lose a goat
+//         if it can be avoided, then leave the tigers the fewest moves) and picks the best.
+// Hard:   the same scoring, but looks 3 moves ahead (its move, the reply, its next move).
+
+
+
+
+const BOT_LEVELS = Object.freeze(['easy', 'medium', 'hard']);
+const EASY_RANDOM_SHARE = 0.55;
+const REPEAT_PENALTY = 25;
+const DEPTH = { easy: 1, medium: 1, hard: 3 };
+
+/** Goat's point of view: bigger is better for the goats. */
+function goatScore(st, extra) {
+  if (st.status === 'goat_win') return 1000;
+  if (st.status === 'tiger_win') return -1000;
+  if (st.status === 'draw') return 0;
+  const mob = tigerMobility(st);
+  const moves = mob.reduce((n, m) => n + m.total, 0);
+  const trapped = mob.filter((m) => m.total === 0).length;
+  const c = st.goatsCaptured;
+  return -(60 * c + 8 * c * c) - 4 * moves - 25 * threats(st).length + 25 * trapped + (extra ? extra(st) : 0);
+}
+
+/** Value for the side to move at `st`. Faster wins score higher (depth bonus). */
+function negamax(st, depth, a, b, config, extra) {
+  const sign = st.turn === 'goat' ? 1 : -1;
+  if (st.status !== 'ongoing') {
+    const base = goatScore(st);  // terminal scores ignore `extra`
+    return sign * (base > 0 ? base + depth : base < 0 ? base - depth : 0);
+  }
+  if (depth === 0) return sign * goatScore(st, extra);
+  let best = -Infinity;
+  for (const m of legalMoves(st, config)) {
+    const v = -negamax(applyMove(st, m, config), depth - 1, -b, -a, config, extra);
+    if (v > best) best = v;
+    if (best > a) a = best;
+    if (a >= b) break;
+  }
+  return best;
+}
+
+/** `extra` (optional) adds a goat-perspective bonus to the position score; used only for strategy experiments. */
+function chooseMove(state, config, level = 'medium', rand = Math.random, extra) {
+  const moves = legalMoves(state, config);
+  if (moves.length === 0) throw new Error('no legal moves');
+  if (moves.length === 1) return moves[0];
+  if (level === 'easy' && rand() < EASY_RANDOM_SHARE) return moves[Math.floor(rand() * moves.length)];
+  const depth = DEPTH[level] ?? 1;
+  let best = -Infinity;
+  let pool = [];
+  for (const m of moves) {
+    const next = applyMove(state, m, config);
+    let v = -negamax(next, depth - 1, -Infinity, Infinity, config, extra);
+    // Don't shuffle back and forth: repeating a position costs a little, so games stay decisive.
+    if (next.status === 'ongoing') v -= REPEAT_PENALTY * Math.max(0, (next.repetition[positionKey(next)] ?? 1) - 1);
+    if (v > best + 1e-9) { best = v; pool = [m]; } else if (Math.abs(v - best) <= 1e-9) pool.push(m);
+  }
+  return pool[Math.floor(rand() * pool.length)];
+}
+
+// Lessons and puzzles. A task is a start position plus a goal; any move that reaches the goal counts.
+// Goals are checked by the rules engine, so every accepted answer is correct by construction.
+
+
+
+const KIND_HINTS = {
+  step: ['Tap one of your pieces, then tap one of the green dots.', 'Move any piece to a neighbouring empty point.'],
+  jump: ['A tiger jumps over a goat next to it, to the empty point right behind.', 'Tap the glowing tiger, then the dot behind the goat.'],
+  place: ['Tap any empty point to place a goat.', 'Any empty point works for this lesson.'],
+  safe: ['A tiger can only jump a goat if the point behind it is empty.', 'Check each tiger: which points does it touch, and what is behind them?'],
+  trap1: ['Count each tiger\'s moves (the number beside it). Which move leaves every tiger with 0?', 'Fill the last open exit next to a tiger.'],
+};
+
+function isGoal(kind, state, move, config) {
+  const next = applyMove(state, move, config);
+  switch (kind) {
+    case 'step': return move.type === 'move';
+    case 'jump': return move.type === 'jump';
+    case 'place': return move.type === 'place';
+    case 'safe': return move.type === 'place' && threats(next).length === 0;
+    case 'trap1': return next.status === 'goat_win';
+    default: return false;
+  }
+}
+
+const solutions = (kind, state, config) =>
+  legalMoves(state, config).filter((m) => isGoal(kind, state, m, config));
+
+const START = { tigers: [22, 18, 19], goatsInHand: 15, turn: 'goat' };
+const LESSONS = [
+  { id: 'l1', title: '1. Move a tiger', text: 'Tigers move one step along a line. Move a tiger.', kind: 'step',
+    pos: { tigers: [22, 18, 19], goats: [0], goatsInHand: 14, turn: 'tiger' } },
+  { id: 'l2', title: '2. Jump and capture', text: 'Jump over the goat to the empty point behind it.', kind: 'jump',
+    pos: { tigers: [22, 9, 21], goats: [17], goatsInHand: 10, turn: 'tiger' } },
+  { id: 'l3', title: '3. Capturing is a must', text: 'A tiger must capture when it can. Take either goat.', kind: 'jump',
+    pos: { tigers: [18, 9, 21], goats: [17, 12], goatsInHand: 8, turn: 'tiger' } },
+  { id: 'l4', title: '4. Place a goat', text: 'Goats start by placing one goat per turn. Place a goat.', kind: 'place', pos: START },
+  { id: 'l5', title: '5. Place it safely', text: 'Place a goat where no tiger can jump it.', kind: 'safe',
+    pos: { tigers: [22, 18, 19], goats: [0], goatsInHand: 14, turn: 'goat' } },
+  { id: 'l6', title: '6. Move a goat', text: 'Once all goats are placed they step along lines. Move the goat.', kind: 'step',
+    pos: { tigers: [22, 9, 21], goats: [0], goatsInHand: 0, turn: 'goat' } },
+  { id: 'l7', title: '7. Trap them all', text: 'Goats win when no tiger can move or jump. Make that move.', kind: 'trap1',
+    pos: { tigers: [0, 3, 4], goats: [1, 2, 5, 6, 8, 10, 11, 16, 20], goatsInHand: 0, turn: 'goat' } },
+];
+
+const STRATEGY = [
+  ['Beginner', [
+    ['Check the point behind', 'A tiger can only jump a goat if the point right behind it is empty. Look behind before you place.'],
+    ['Take away exits', 'Goats win by leaving every tiger with no move. Watch the number beside each tiger and push it to 0.'],
+    ['Tigers: stay mobile', 'A tiger with many moves is hard to trap. Avoid corners and edges, and do not chase every goat.'],
+    ['One goat is not the game', 'Tigers need 5 captures. Losing a goat is fine if it helps trap a tiger.'],
+  ]],
+  ['Intermediate', [
+    ['Protect with a neighbour', 'Filling the point behind a goat makes it safe from that jump. Goats side by side guard each other.'],
+    ['Count the race', 'Keep track of both goals: captures so far for the tigers, and how few moves the tigers have left.'],
+    ['Capturing is forced', 'Because a tiger must capture, a goat offered at the right moment steers it. Check where the tiger lands first.'],
+  ]],
+  ['Advanced', [
+    ['Goats: safety beats cleverness', 'In computer-played games, goats that refused to leave any goat capturable won far more often than goats that accepted sacrifices. Take a safe move whenever one exists.'],
+    ['Tigers: hold the apex', 'Tigers that kept a tiger on the apex won noticeably more often. It is a hard point for goats to attack and it keeps the tigers close together.'],
+    ['Goats: stay close, not scattered', 'Goats spread across the edges or back rows early did badly. Placing goats next to each other made them very hard to beat, though too much clustering gives only draws, so you still have to close the traps.'],
+    ['Know a draw when you see one', 'Solid goats and cautious tigers often repeat positions. A draw by repetition or a claimed draw is a fair result; to win, change the position with a capture or a trap.'],
+  ]],
+];
+
+// Generated by tools/make_puzzles.mjs (verified by the rules engine). Do not edit by hand.
+const PUZZLES = [
+ {
+  "id": "w1",
+  "set": "Warm-up",
+  "kind": "safe",
+  "title": "Warm-up 1",
+  "text": "Place a goat where no tiger can jump it.",
+  "pos": {
+   "tigers": [
+    12,
+    13,
+    17
+   ],
+   "goats": [
+    4,
+    16,
+    22
+   ],
+   "goatsInHand": 12,
+   "turn": "goat"
+  }
+ },
+ {
+  "id": "w2",
+  "set": "Warm-up",
+  "kind": "safe",
+  "title": "Warm-up 2",
+  "text": "Place a goat where no tiger can jump it.",
+  "pos": {
+   "tigers": [
+    6,
+    13,
+    17
+   ],
+   "goats": [
+    4,
+    16,
+    19,
+    22
+   ],
+   "goatsInHand": 11,
+   "turn": "goat"
+  }
+ },
+ {
+  "id": "w3",
+  "set": "Warm-up",
+  "kind": "safe",
+  "title": "Warm-up 3",
+  "text": "Place a goat where no tiger can jump it.",
+  "pos": {
+   "tigers": [
+    6,
+    14,
+    17
+   ],
+   "goats": [
+    4,
+    5,
+    16,
+    19,
+    22
+   ],
+   "goatsInHand": 10,
+   "turn": "goat"
+  }
+ },
+ {
+  "id": "s1",
+  "set": "Safe or not?",
+  "kind": "safe",
+  "title": "Safe or not? 1",
+  "text": "Only a few points are safe. Place a goat on one.",
+  "pos": {
+   "tigers": [
+    7,
+    17,
+    18
+   ],
+   "goats": [
+    1,
+    3,
+    4,
+    10,
+    15,
+    16,
+    22
+   ],
+   "goatsInHand": 8,
+   "turn": "goat"
+  }
+ },
+ {
+  "id": "s2",
+  "set": "Safe or not?",
+  "kind": "safe",
+  "title": "Safe or not? 2",
+  "text": "Only a few points are safe. Place a goat on one.",
+  "pos": {
+   "tigers": [
+    13,
+    18,
+    21
+   ],
+   "goats": [
+    4,
+    5,
+    6,
+    10,
+    16,
+    17,
+    22
+   ],
+   "goatsInHand": 8,
+   "turn": "goat"
+  }
+ },
+ {
+  "id": "s3",
+  "set": "Safe or not?",
+  "kind": "safe",
+  "title": "Safe or not? 3",
+  "text": "Only a few points are safe. Place a goat on one.",
+  "pos": {
+   "tigers": [
+    9,
+    12,
+    19
+   ],
+   "goats": [
+    3,
+    4,
+    5,
+    16,
+    17,
+    18,
+    22
+   ],
+   "goatsInHand": 8,
+   "turn": "goat"
+  }
+ },
+ {
+  "id": "s4",
+  "set": "Safe or not?",
+  "kind": "safe",
+  "title": "Safe or not? 4",
+  "text": "Only a few points are safe. Place a goat on one.",
+  "pos": {
+   "tigers": [
+    7,
+    11,
+    18
+   ],
+   "goats": [
+    1,
+    2,
+    3,
+    4,
+    16,
+    21,
+    22
+   ],
+   "goatsInHand": 8,
+   "turn": "goat"
+  }
+ },
+ {
+  "id": "t1",
+  "set": "Trap the tiger",
+  "kind": "trap1",
+  "title": "Trap the tigers 1",
+  "text": "One move leaves every tiger with no step and no jump. Find it.",
+  "pos": {
+   "tigers": [
+    5,
+    1,
+    2
+   ],
+   "goats": [
+    0,
+    4,
+    6,
+    11,
+    7,
+    17,
+    12,
+    13
+   ],
+   "goatsInHand": 3,
+   "turn": "goat"
+  }
+ },
+ {
+  "id": "t2",
+  "set": "Trap the tiger",
+  "kind": "trap1",
+  "title": "Trap the tigers 2",
+  "text": "One move leaves every tiger with no step and no jump. Find it.",
+  "pos": {
+   "tigers": [
+    3,
+    0,
+    1
+   ],
+   "goats": [
+    2,
+    8,
+    14,
+    5,
+    11,
+    12,
+    7
+   ],
+   "goatsInHand": 0,
+   "turn": "goat"
+  }
+ },
+ {
+  "id": "t3",
+  "set": "Trap the tiger",
+  "kind": "trap1",
+  "title": "Trap the tigers 3",
+  "text": "One move leaves every tiger with no step and no jump. Find it.",
+  "pos": {
+   "tigers": [
+    6,
+    1,
+    0
+   ],
+   "goats": [
+    5,
+    7,
+    12,
+    4,
+    8,
+    18,
+    2,
+    11
+   ],
+   "goatsInHand": 3,
+   "turn": "goat"
+  }
+ },
+ {
+  "id": "t4",
+  "set": "Trap the tiger",
+  "kind": "trap1",
+  "title": "Trap the tigers 4",
+  "text": "One move leaves every tiger with no step and no jump. Find it.",
+  "pos": {
+   "tigers": [
+    4,
+    16,
+    5
+   ],
+   "goats": [
+    10,
+    17,
+    18,
+    0,
+    6,
+    11,
+    2
+   ],
+   "goatsInHand": 0,
+   "turn": "goat"
+  }
+ },
+ {
+  "id": "t5",
+  "set": "Trap the tiger",
+  "kind": "trap1",
+  "title": "Trap the tigers 5",
+  "text": "One move leaves every tiger with no step and no jump. Find it.",
+  "pos": {
+   "tigers": [
+    1,
+    4,
+    10
+   ],
+   "goats": [
+    0,
+    2,
+    6,
+    3,
+    12,
+    5,
+    11
+   ],
+   "goatsInHand": 3,
+   "turn": "goat"
+  }
+ }
+];
+
+
+
+(() => {
+  const cfg = createConfig();
+  const LEVELS = ['guided', 'standard', 'expert'];
+  const NAMES = { guided: 'Guided', standard: 'Standard', expert: 'Expert' };
+  const $ = (id) => document.getElementById(id);
+  let states = [newGame(cfg)];
+  let sel = null, warn = null, msg = '', help = 'guided', replay = null, timer = null;
+  let scene = false, started = false, vsCpu = true, level = 'medium';
+  let task = null, keep = null;
+  let bottom = 'tiger'; // which side sits at the bottom of the screen (like choosing White or Black)
+  const P = (p) => (bottom === 'goat' ? [680 - COORDS[p][0], 550 - COORDS[p][1]] : COORDS[p]);
+  const cur = () => states[states.length - 1];
+  const cpuSide = () => (bottom === 'goat' ? 'tiger' : 'goat'); // you play the side shown at the bottom
+
+  const getSave = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
+  const store = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage may be unavailable */ } };
+  const stamps = new Set(getSave('apa.stamps', []));
+  const SHEETS = ['home', 'start', 'list'];
+  const show = (id) => SHEETS.forEach((x) => { $(x).hidden = x !== id; });
+  const TASKS = [...LESSONS, ...PUZZLES];
+  const tick = (id) => (stamps.has(id) ? ' ✓' : '');
+  const btn = (act, label, cls = '') => `<button class="${cls}" data-act="${act}">${label}</button>`;
+  function screen(name) {
+    let h;
+    if (name === 'learn') {
+      h = '<h2>Learn</h2><p>Short lessons, about a minute each. Do them in order or jump around.</p><div class="col">' +
+        LESSONS.map((t) => btn('task:' + t.id, t.title + tick(t.id), 'big')).join('') + btn('goStrategy', 'Strategy guide', 'big') + '</div>';
+    } else if (name === 'strategy') {
+      h = '<h2>Strategy</h2>' + STRATEGY.map(([lvl, cards]) => `<h3>${lvl}</h3>` + cards.map(([t, x]) => `<p><b>${t}.</b> ${x}</p>`).join('')).join('') +
+        '<p><i>The Advanced ideas were tested in thousands of computer-played games, not human games.</i></p>' + btn('goPuzzles', 'Practise in Puzzles', 'primary');
+    } else if (name === 'puzzles') {
+      const sets = [...new Set(PUZZLES.map((p) => p.set))];
+      h = '<h2>Puzzles</h2><p>Hints are always available, and a wrong move just lets you try again.</p>' + sets.map((x) => `<h3>${x}</h3><div class="row">` +
+        PUZZLES.filter((p) => p.set === x).map((p, i) => btn('task:' + p.id, (i + 1) + tick(p.id))).join('') + '</div>').join('');
+    } else {
+      h = '<h2>More</h2><div class="col">' + btn('backup', 'Backup code', 'big') + btn('restore', 'Restore from a code', 'big') +
+        (document.documentElement.requestFullscreen ? btn('fullscreen', 'Full screen', 'big') : '') + btn('clean', 'Clean view (tap the title to leave it)', 'big') + '</div>';
+    }
+    $('listBody').innerHTML = h + '<div class="row">' + btn('goHome', 'Back') + '</div>';
+    show('list');
+  }
+  function openTask(id) {
+    const t = TASKS.find((x) => x.id === id);
+    if (!task) keep = { states, vsCpu, bottom };
+    clearTimeout(timer); timer = null;
+    task = { t, misses: 0, hint: 0, done: false };
+    states = [makeState(cfg, t.pos)]; vsCpu = false; bottom = t.pos.turn; sel = null; warn = null; msg = ''; replay = null; scene = false;
+    show(null);
+  }
+  function exitTask(name) {
+    if (task && keep) { states = keep.states; vsCpu = keep.vsCpu; bottom = keep.bottom; }
+    task = null; keep = null; sel = null; msg = '';
+    screen(name);
+  }
+  const taskBar = () => btn('hint', 'Hint') + btn('resetTask', 'Restart') + btn('exitTask', 'Back to list');
+  const taskDone = () => `<p>Solved! A stamp was added.</p><div class="row">${btn('nextTask', 'Next', 'primary')}${btn('resetTask', 'Again')}${btn('exitTask', 'Back to list')}</div>`;
+
+  // ---- sound: drop files into audio/ (music.m4a or music.mp3, roar.mp3, bleat.mp3). Missing files stay silent.
+  const snd = { on: true, music: true };
+  const load = (urls, loop) => {
+    const a = new Audio(); let i = 0;
+    a.loop = loop; a.preload = 'auto';
+    const next = () => { if (i < urls.length) a.src = urls[i++]; else a.dead = true; };
+    a.addEventListener('error', next); next();
+    return a;
+  };
+  const clips = {
+    music: load(['audio/music.m4a', 'audio/music.mp3'], true),
+    roar: load(['audio/roar.mp3', 'audio/roar.m4a'], false),
+    bleat: load(['audio/bleat.mp3', 'audio/bleat.m4a'], false),
+  };
+  const hit = (name, rate = 1) => {
+    const a = clips[name];
+    if (!snd.on || a.dead) return;
+    const c = a.cloneNode();
+    c.playbackRate = rate; c.preservesPitch = false; c.webkitPreservesPitch = false;
+    c.play().catch(() => {});
+  };
+  const herd = () => [0, 180, 330, 520, 700].forEach((ms, i) => setTimeout(() => hit('bleat', [1, 0.88, 1.15, 0.95, 1.25][i]), ms));
+  const syncMusic = () => {
+    const m = clips.music;
+    if (m.dead) return;
+    if (snd.on && snd.music && started && !document.hidden) m.play().catch(() => {}); else m.pause();
+  };
+  const trappedCount = (st) => tigerMobility(st).filter((m) => m.total === 0).length;
+  function cheer(a, b) {
+    if (b.goatsCaptured > a.goatsCaptured) {
+      hit('roar');
+      if (b.status === 'tiger_win') setTimeout(() => hit('roar', 0.85), 450);
+    }
+    if (b.status === 'goat_win') herd(); else if (trappedCount(b) > trappedCount(a)) hit('bleat');
+    scene = !task && b.status !== 'ongoing';
+  }
+
+  // ---- end-of-game scene: one picture shows both sides' reactions
+  const hat = (x, y) => `<polygon points="${x - 9},${y} ${x + 9},${y} ${x},${y - 22}" fill="#E0533F" stroke="#fff" stroke-width="1.5"/><circle cx="${x}" cy="${y - 23}" r="3.5" fill="#F2C94C"/>`;
+  const crown = (x, y) => `<polygon points="${x - 14},${y} ${x - 14},${y - 18} ${x - 7},${y - 8} ${x},${y - 20} ${x + 7},${y - 8} ${x + 14},${y - 18} ${x + 14},${y}" fill="#F2C94C" stroke="#9A6B00" stroke-width="2"/>`;
+  const flag = (x, y) => `<line x1="${x}" y1="${y}" x2="${x}" y2="${y - 34}" stroke="#7A6A55" stroke-width="3"/><rect x="${x}" y="${y - 34}" width="22" height="14" fill="#fff" stroke="#bbb"/>`;
+  const sprite = (kind, x, y, o = {}) => {
+    const k = o.scale || 1, cx = x / k, cy = y / k, top = kind === 'T' ? cy - 17 : cy - 15;
+    const art = kind === 'T' ? tigerSVG([cx, cy], !!o.grey, false) : goatSVG([cx, cy], false);
+    const extra = (o.hat ? hat(cx, top) : '') + (o.crown ? crown(cx, top) : '') + (o.flag ? flag(cx + 22, cy + 6) : '') +
+      (o.zzz ? `<text x="${cx + 18}" y="${cy - 26}" font-size="16" fill="#F2E4C8">z z z</text>` : '');
+    return `<g class="${o.cls || ''}" style="animation-delay:${o.delay || 0}s" data-snd="${kind === 'T' ? 'roar' : 'bleat'}"><g transform="scale(${k})">${art}${extra}</g></g>`;
+  };
+  function sceneHTML(s) {
+    const text = {
+      goat_win: ['Goats win!', 'Every tiger is trapped. Nap time!'],
+      tiger_win: ['Tigers win!', `${s.goatsCaptured} goats captured. Great hunt!`],
+      draw: ['Draw', 'Peace in the jungle.'],
+    }[s.status];
+    let art = '';
+    if (s.status === 'goat_win') {
+      art = [70, 180, 290].map((x) => sprite('T', x, 220, { grey: 1, zzz: 1, scale: 1.2 })).join('') +
+        [[55, 110], [150, 92], [240, 110], [315, 92]].map(([x, y], i) => sprite('G', x, y, { hat: 1, cls: 'hop', delay: i * 0.18 })).join('') +
+        Array.from({ length: 14 }, (_, i) => `<circle class="fall" cx="${18 + i * 24}" cy="-8" r="4" fill="${i % 2 ? '#E8872B' : '#F2C94C'}" style="animation-delay:${(i * 0.37) % 3}s"/>`).join('');
+    } else if (s.status === 'tiger_win') {
+      art = sprite('T', 180, 170, { scale: 1.8, crown: 1, cls: 'hop' }) + sprite('T', 55, 215, { cls: 'hop', delay: 0.2 }) + sprite('T', 305, 215, { cls: 'hop', delay: 0.4 }) +
+        [60, 180, 300].map((x, i) => sprite('G', x, i === 1 ? 45 : 65, { flag: 1 })).join('');
+    } else {
+      art = sprite('T', 110, 170, { scale: 1.6 }) + sprite('G', 250, 175, { scale: 1.6 }) +
+        '<text class="hop" x="165" y="110" font-size="30" fill="#E0533F">♥</text>';
+    }
+    return `<svg viewBox="0 0 360 280" role="img" aria-label="${text[0]}">${art}</svg><h2>${text[0]}</h2><p>${text[1]}</p>` +
+      '<div class="row"><button class="primary" data-act="start">Play again</button><button data-act="swap">Swap sides</button>' +
+      '<button data-act="replay">Replay game</button><button data-act="hideScene">Show board</button></div>';
+  }
+
+  const tigerSVG = (p, trapped, picked) => {
+    const [x, y] = Array.isArray(p) ? p : P(p);
+    const f = trapped ? '#9C9487' : '#E8872B';
+    const e = trapped ? '#5E584E' : '#8A3F0B';
+    return `<g transform="translate(${x},${y})">${picked ? '<circle r="29" fill="none" stroke="#2F7D4F" stroke-width="4"/>' : ''}` +
+      `<circle cx="-13" cy="-15" r="7" fill="${f}" stroke="${e}" stroke-width="2"/><circle cx="13" cy="-15" r="7" fill="${f}" stroke="${e}" stroke-width="2"/>` +
+      `<circle r="20" fill="${f}" stroke="${e}" stroke-width="2"/>` +
+      `<path d="M-3 -19L-3 -9M3 -19L3 -9M-17 -3L-10 0M17 -3L10 0" fill="none" stroke="#3A1C05" stroke-width="3" stroke-linecap="round"/>` +
+      `<circle cx="-7" cy="3" r="2.5" fill="#3A1C05"/><circle cx="7" cy="3" r="2.5" fill="#3A1C05"/><path d="M-4 10L4 10L0 15Z" fill="#3A1C05"/></g>`;
+  };
+  const goatSVG = (p, picked) => {
+    const [x, y] = Array.isArray(p) ? p : P(p);
+    return `<g transform="translate(${x},${y})">${picked ? '<circle r="27" fill="none" stroke="#2F7D4F" stroke-width="4"/>' : ''}` +
+      `<circle r="18" fill="#F7F0E0" stroke="#7A6A55" stroke-width="2"/>` +
+      `<path d="M-10 -14Q-17 -26 -6 -26M10 -14Q17 -26 6 -26" fill="none" stroke="#7A6A55" stroke-width="3" stroke-linecap="round"/>` +
+      `<circle cx="-6" cy="-2" r="2.5" fill="#3A2F20"/><circle cx="6" cy="-2" r="2.5" fill="#3A2F20"/><ellipse cx="0" cy="8" rx="7" ry="5" fill="#E3D5BA"/></g>`;
+  };
+
+  function boardSVG(s, moves) {
+    const hl = task ? 'standard' : help;
+    const aids = hl !== 'expert';
+    const guided = hl === 'guided';
+    const live = replay === null && s.status === 'ongoing';
+    let o = '<svg viewBox="50 8 580 536" role="img" aria-label="Game board">' +
+      '<rect x="56" y="14" width="568" height="522" rx="22" fill="#F1DDB5" stroke="#C79A5B" stroke-width="3"/>' +
+      '<rect x="68" y="26" width="544" height="498" rx="16" fill="none" stroke="#D8B77E" stroke-width="3" stroke-dasharray="1 9" stroke-linecap="round"/>' +
+      '<g stroke="#6B4423" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none">' +
+      LINES.map((l) => `<polyline points="${l.map((p) => P(p).join(',')).join(' ')}"/>`).join('') + '</g>' +
+      COORDS.map((_, i) => P(i)).map(([x, y]) => `<circle cx="${x}" cy="${y}" r="7" fill="#6B4423"/>`).join('');
+    const last = s.history[s.history.length - 1];
+    if (last) {
+      const [lx, ly] = P(last.to);
+      o += `<circle cx="${lx}" cy="${ly}" r="25" fill="none" stroke="#E8872B" stroke-width="3" opacity=".6"/>`;
+      if (last.type === 'jump') {
+        const [ox, oy] = P(last.over);
+        o += `<path transform="translate(${ox},${oy})" d="M-9 -9L9 9M9 -9L-9 9" stroke="#C0392B" stroke-width="4" stroke-linecap="round"/>`;
+      }
+    }
+    if (guided && s.status === 'ongoing') {
+      for (const t of threats(s)) {
+        const [gx, gy] = P(t.goat);
+        const [bx, by] = P(t.landing);
+        o += `<circle cx="${gx}" cy="${gy}" r="27" fill="none" stroke="#C0392B" stroke-width="3"/>` +
+          `<circle cx="${bx}" cy="${by}" r="17" fill="none" stroke="#C0392B" stroke-width="3" stroke-dasharray="5 5"/>`;
+      }
+    }
+    if (live && aids && sel !== null) {
+      for (const m of moves) {
+        if (m.from !== sel) continue;
+        const [dx, dy] = P(m.to);
+        o += `<circle cx="${dx}" cy="${dy}" r="${m.type === 'jump' ? 13 : 10}" fill="#2F7D4F" opacity=".85"/>`;
+      }
+    }
+    if (live && guided && sel === null && s.turn === 'tiger') {
+      for (const m of moves) {
+        if (m.type !== 'jump') continue;
+        const [jx, jy] = P(m.from);
+        o += `<circle class="pulse" cx="${jx}" cy="${jy}" r="29" fill="none" stroke="#E8872B" stroke-width="4"/>`;
+      }
+    }
+    if (task && task.hint >= 3 && !task.done) {
+      const m = solutions(task.t.kind, s, cfg)[0];
+      if (m) [m.from, m.to].forEach((q) => { if (q !== undefined) { const [hx, hy] = P(q); o += `<circle class="pulse" cx="${hx}" cy="${hy}" r="30" fill="none" stroke="#2F7D4F" stroke-width="5"/>`; } });
+    }
+    const mob = {};
+    tigerMobility(s).forEach((m) => { mob[m.tiger] = m.total; });
+    for (let p = 0; p < COORDS.length; p++) {
+      if (s.board[p] === 'T') o += tigerSVG(p, mob[p] === 0, sel === p && live);
+      else if (s.board[p] === 'G') o += goatSVG(p, sel === p && live);
+    }
+    if (aids) {
+      for (const p of Object.keys(mob)) {
+        const [x, y] = Array.isArray(p) ? p : P(p);
+        o += `<circle cx="${x + 24}" cy="${y - 24}" r="11" fill="#3A1C05"/>` +
+          `<text x="${x + 24}" y="${y - 24}" fill="#F2E4C8" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central">${mob[p]}</text>`;
+      }
+    }
+    if (live) o += COORDS.map((_, i) => P(i)).map(([x, y], i) => `<circle data-p="${i}" cx="${x}" cy="${y}" r="26" fill="transparent"/>`).join('');
+    return o + '</svg>';
+  }
+
+  function describe(s, moves) {
+    if (s.status === 'tiger_win') return ['Tigers win', `${s.goatsCaptured} goats captured.`];
+    if (s.status === 'goat_win') return ['Goats win', 'Every tiger is trapped.'];
+    if (s.status === 'draw') {
+      return ['Draw', s.reason === 'claimed' ? 'A draw was claimed.' : 'The same position came up three times.'];
+    }
+    if (s.turn === 'goat') {
+      return phaseOf(s) === 'placement' ? ['Goats: place a goat', 'Tap any empty point.'] : ['Goats: move a goat', 'Tap a goat, then an empty point next to it.'];
+    }
+    return moves.some((m) => m.type === 'jump') && cfg.forcedCapture
+      ? ['Tigers: you must capture', 'Tap a tiger that can jump, then the landing point.']
+      : ['Tigers: move a tiger', 'Tap a tiger, then an empty point next to it.'];
+  }
+
+  function render() {
+    const s = replay === null ? cur() : states[replay];
+    const live = replay === null && s.status === 'ongoing';
+    const moves = live ? legalMoves(s, cfg) : [];
+    if (live && !timer && !task && SHEETS.every((x) => $(x).hidden)) {
+      const cpu = vsCpu && s.turn === cpuSide();
+      if (cpu || moves.length === 1) {
+        msg = cpu ? 'The computer is thinking…' : moves[0].type === 'pass' ? 'No goat can move, so the goats pass.' : 'Only one legal move, so it is played for you.';
+        timer = setTimeout(() => {
+          timer = null;
+          const now = cur();
+          if (now.status === 'ongoing') commit(cpu ? chooseMove(now, cfg, level) : legalMoves(now, cfg)[0]);
+        }, cpu ? 1000 : 900);
+      }
+    }
+    const [title, note] = task ? [task.t.title, task.t.text] : describe(s, moves);
+    $('turn').textContent = title;
+    $('msg').textContent = msg || (live || task ? note : '');
+    $('board').innerHTML = boardSVG(s, moves);
+    const done = replay === null && s.status !== 'ongoing' && scene;
+    $('cele').hidden = !done;
+    if (done) $('celeBody').innerHTML = sceneHTML(s);
+    const c = Math.min(s.goatsCaptured, cfg.capturesToWin);
+    $('counts').innerHTML = `<span>Goats in hand <b>${s.goatsInHand}</b></span>` +
+      `<span>Captured <span class="pips">${'●'.repeat(c)}${'○'.repeat(cfg.capturesToWin - c)}</span></span>`;
+    $('bar').hidden = !live;
+    $('bar').innerHTML = `<button data-act="undo"${states.length < 2 ? ' disabled' : ''}>Undo</button>` +
+      `<button data-act="help">Help: ${NAMES[help]}</button>` +
+      (canClaimDraw(s, cfg) ? '<button data-act="claim">Claim draw</button>' : '') +
+      `<button data-act="sound">Sound: ${snd.on ? 'On' : 'Off'}</button><button data-act="flip">Flip board</button><button data-act="menu">Menu</button>`;
+    $('sideGoat').setAttribute('aria-pressed', String(bottom === 'goat'));
+    $('sideTiger').setAttribute('aria-pressed', String(bottom === 'tiger'));
+    $('musicBtn').textContent = `Music: ${snd.music ? 'On' : 'Off'}`;
+    $('modePerson').setAttribute('aria-pressed', String(!vsCpu));
+    $('modeCpu').setAttribute('aria-pressed', String(vsCpu));
+    $('levels').hidden = !vsCpu;
+    ['Easy', 'Medium', 'Hard'].forEach((n) => $('lvl' + n).setAttribute('aria-pressed', String(level === n.toLowerCase())));
+    if (task) $('bar').hidden = false, $('bar').innerHTML = taskBar();
+    if (task) {
+      $('end').innerHTML = task.done ? taskDone() : '';
+    } else if (replay !== null) {
+      const h = s.history[s.history.length - 1];
+      const what = !h ? 'Start of the game.' : h.type === 'jump' ? 'A tiger captured a goat.' : h.type === 'place' ? 'A goat was placed.' : h.type === 'pass' ? 'The goats passed.' : 'A piece moved.';
+      $('end').innerHTML = `<p>Move ${replay} of ${states.length - 1}. ${what}</p><div class="row">` +
+        `<button data-act="prev"${replay === 0 ? ' disabled' : ''}>◀ Back</button>` +
+        `<button data-act="next"${replay === states.length - 1 ? ' disabled' : ''}>Forward ▶</button>` +
+        '<button class="primary" data-act="closeReplay">Close</button></div>';
+    } else if (s.status !== 'ongoing') {
+      $('end').innerHTML = `<p>${note}</p><div class="row"><button class="primary" data-act="start">Play again</button>` +
+        '<button data-act="replay">Replay game</button><button data-act="undo">Undo last move</button></div>';
+    } else {
+      $('end').innerHTML = '';
+    }
+    $('resume').hidden = !(states.length > 1 && cur().status === 'ongoing');
+  }
+
+  function commit(move) {
+    if (task && !task.done && !isGoal(task.t.kind, cur(), move, cfg)) {
+      task.misses += 1;
+      msg = task.misses >= 2 ? `Not quite. ${KIND_HINTS[task.t.kind][0]}` : 'Not quite. Try another move.';
+      sel = null;
+      return render();
+    }
+    try {
+      const prev = cur();
+      const next = move.type === 'claim' ? claimDraw(prev, cfg) : applyMove(prev, move, cfg);
+      states.push(next);
+      sel = null; warn = null; msg = '';
+      cheer(prev, next);
+      if (task && !task.done) { task.done = true; stamps.add(task.t.id); store('apa.stamps', [...stamps]); msg = 'Solved! Well done.'; }
+      else if (!task) store('apa.game', { h: next.history, bottom, vsCpu, level });
+    } catch (err) {
+      msg = err.message;
+    }
+    render();
+  }
+
+  function onPoint(p) {
+    const s = cur();
+    if (replay !== null || s.status !== 'ongoing') return;
+    if (vsCpu && s.turn === cpuSide()) return;
+    if (task && task.done) return;
+    msg = '';
+    const piece = s.board[p];
+    if (s.turn === 'goat' && phaseOf(s) === 'placement') {
+      if (piece !== null) { msg = explainIllegal(s, { type: 'place', to: p }, cfg).message; return render(); }
+      if (!task && help === 'guided' && warn !== p && placementRisk(s, p).length > 0) {
+        warn = p;
+        msg = 'A tiger could jump a goat placed here. Tap again to place it anyway.';
+        return render();
+      }
+      return commit({ type: 'place', to: p });
+    }
+    if (piece === (s.turn === 'goat' ? 'G' : 'T')) { sel = sel === p ? null : p; return render(); }
+    if (sel === null) { msg = s.turn === 'goat' ? 'Tap a goat to move it.' : 'Tap a tiger to move it.'; return render(); }
+    const legal = legalMoves(s, cfg).find((m) => m.from === sel && m.to === p);
+    if (legal) return commit(legal);
+    const jump = s.turn === 'tiger' ? JUMPS.find((j) => j.from === sel && j.to === p) : null;
+    const tried = jump ? { type: 'jump', ...jump } : { type: 'move', from: sel, to: p };
+    msg = (explainIllegal(s, tried, cfg) || { message: 'That move is not legal.' }).message;
+    return render();
+  }
+
+  function run(a) {
+    if (a === 'how') $('how').hidden = false;
+    else if (a === 'closeHow') $('how').hidden = true;
+    else if (a === 'resume') { show(null); started = true; syncMusic(); }
+    else if (a === 'menu') show('home');
+    else if (a === 'start') {
+      clearTimeout(timer); timer = null;
+      states = [newGame(cfg)]; sel = null; warn = null; msg = ''; replay = null; scene = false; started = true; syncMusic();
+      show(null);
+    } else if (a === 'undo') {
+      if (states.length > 1) { clearTimeout(timer); timer = null; states.pop(); while (vsCpu && states.length > 1 && cur().turn === cpuSide()) states.pop(); sel = null; warn = null; msg = ''; scene = false; }
+    } else if (a === 'help') {
+      help = LEVELS[(LEVELS.indexOf(help) + 1) % LEVELS.length]; warn = null;
+    } else if (a === 'claim') return commit({ type: 'claim' });
+    else if (a === 'goHome') show('home');
+    else if (a === 'goPlay') show('start');
+    else if (['goLearn', 'goPuzzles', 'goStrategy', 'goMore'].includes(a)) screen(a.slice(2).toLowerCase());
+    else if (a.startsWith('task:')) openTask(a.slice(5));
+    else if (a === 'hint') { task.hint = Math.min(3, task.hint + 1); msg = task.hint < 3 ? KIND_HINTS[task.t.kind][task.hint - 1] : 'The glowing points show the move.'; }
+    else if (a === 'resetTask') openTask(task.t.id);
+    else if (a === 'nextTask') { const nx = TASKS[TASKS.indexOf(task.t) + 1]; if (nx && !!nx.set === !!task.t.set) openTask(nx.id); else exitTask(task.t.set ? 'puzzles' : 'learn'); }
+    else if (a === 'exitTask') exitTask(task.t.set ? 'puzzles' : 'learn');
+    else if (a === 'fullscreen') document.documentElement.requestFullscreen?.();
+    else if (a === 'clean') document.body.classList.toggle('clean');
+    else if (a === 'backup') window.prompt('Your backup code (copy it somewhere safe):', btoa(JSON.stringify({ s: [...stamps], l: level, b: bottom })));
+    else if (a === 'restore') {
+      const code = window.prompt('Paste a backup code:');
+      if (code) {
+        try { const d = JSON.parse(atob(code)); d.s.forEach((x) => stamps.add(x)); store('apa.stamps', [...stamps]); level = d.l || level; bottom = d.b || bottom; }
+        catch { window.alert('That code did not work.'); }
+      }
+    }
+    else if (a === 'modePerson') vsCpu = false;
+    else if (a === 'modeCpu') vsCpu = true;
+    else if (a.startsWith('lvl')) level = a.slice(3).toLowerCase();
+    else if (a === 'sound') { snd.on = !snd.on; syncMusic(); }
+    else if (a === 'music') { snd.music = !snd.music; syncMusic(); }
+    else if (a === 'test') { started = true; syncMusic(); hit('roar'); setTimeout(() => hit('bleat'), 1000); }
+    else if (a === 'hideScene') scene = false;
+    else if (a === 'swap') { bottom = bottom === 'goat' ? 'tiger' : 'goat'; return run('start'); }
+    else if (a === 'sideGoat') bottom = 'goat';
+    else if (a === 'sideTiger') bottom = 'tiger';
+    else if (a === 'flip') bottom = bottom === 'goat' ? 'tiger' : 'goat';
+    else if (a === 'replay') { replay = 0; scene = false; }
+    else if (a === 'prev') replay = Math.max(0, replay - 1);
+    else if (a === 'next') replay = Math.min(states.length - 1, replay + 1);
+    else if (a === 'closeReplay') replay = null;
+    render();
+  }
+
+  document.addEventListener('click', (e) => {
+    if (document.body.classList.contains('clean') && e.target.closest('#turn')) { document.body.classList.remove('clean'); return; }
+    const sx = e.target.closest('[data-snd]');
+    if (sx) return hit(sx.dataset.snd);
+    const b = e.target.closest('[data-act]');
+    if (b) return run(b.dataset.act);
+    const pt = e.target.closest('[data-p]');
+    if (pt) onPoint(Number(pt.dataset.p));
+  });
+  try {
+    const g = getSave('apa.game', null);
+    if (g && g.h && g.h.length) {
+      const st = replayMoves(cfg, g.h);
+      if (st[st.length - 1].status === 'ongoing') { states = st; bottom = g.bottom || bottom; vsCpu = g.vsCpu ?? vsCpu; level = g.level || level; }
+    }
+  } catch { /* ignore a bad save */ }
+  document.addEventListener('visibilitychange', syncMusic);
+  render();
+})();
+
+})();
+</script>
+</body>
+</html>
